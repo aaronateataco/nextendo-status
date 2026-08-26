@@ -1,9 +1,0 @@
-// vercel.json
-{
-  "crons": [
-    {
-      "path": "/api/cron-update",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
