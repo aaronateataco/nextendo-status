@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     }
 
     // Cache missing or stale — fetch fresh
-    const proxyUrl = `https://api.scraperapi.com/?api_key=${process.env.SCRAPERAPI_KEY}&url=${encodeURIComponent("https://nextendo.network/api/online-counts")}&keep_headers=true`;
+    const proxyUrl = `https://api.scraperapi.com/?api_key=${process.env.SCRAPERAPI_KEY}&url=https%3A%2F%2Fnextendo.network%2Fapi%2Fonline-counts`;
 
     const response = await fetch(proxyUrl, {
       headers: {
