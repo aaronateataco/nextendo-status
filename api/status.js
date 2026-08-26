@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
   try {
     const cached = await kv.get('nextendo-status');
-    const lastFetch = await kv.get('nextendo-status-time') || 0;
+    const lastFetch = (await kv.get('nextendo-status-time')) || 0;
     const isStale = Date.now() - lastFetch > CACHE_TTL_MS;
 
     if (cached && !isStale) {
@@ -17,7 +17,12 @@ export default async function handler(req, res) {
     }
 
     // Cache missing or stale — fetch fresh
-    const proxyUrl = `https://api.scraperapi.com/?api_key=${process.env.SCRAPERAPI_KEY}&url=https%3A%2F%2Fnextendo.network%2Fapi%2Fonline-counts`;
+    // keep_headers=true tells ScraperAPI to actually forward our Cookie/Referer/UA
+    // to the target site instead of using its own defaults.
+    const proxyUrl =
+      `https://api.scraperapi.com/?api_key=${process.env.SCRAPERAPI_KEY}` +
+      `&url=https%3A%2F%2Fnextendo.network%2Fapi%2Fonline-counts` +
+      `&keep_headers=true`;
 
     const response = await fetch(proxyUrl, {
       headers: {
@@ -27,8 +32,18 @@ export default async function handler(req, res) {
       }
     });
 
-    if (!response.ok) throw new Error(`Target responded ${response.status}`);
-    const data = await response.json();
+    const rawText = await response.text();
+
+    if (!response.ok) {
+      throw new Error(`Target responded ${response.status}: ${rawText.slice(0, 300)}`);
+    }
+
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      throw new Error(`Non-JSON response from target: ${rawText.slice(0, 300)}`);
+    }
 
     await kv.set('nextendo-status', data);
     await kv.set('nextendo-status-time', Date.now());
@@ -36,10 +51,15 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } catch (error) {
-    console.error("Fetch Error:", error);
+    console.error("Fetch Error:", error.message);
+
     // fall back to stale cache if we have one, rather than erroring out
     const cached = await kv.get('nextendo-status').catch(() => null);
-    if (cached) return res.status(200).json(cached);
+    if (cached) {
+      console.warn("Serving stale cache due to fetch error");
+      return res.status(200).json(cached);
+    }
+
     return res.status(500).json({ error: "Failed to fetch status", message: error.message });
   }
 }
