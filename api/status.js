@@ -1,22 +1,19 @@
 // api/status.js
-import { kv } from '@vercel/kv';
-
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
+  // Let Vercel's edge/CDN cache the response for 1 hour.
+  // stale-while-revalidate means visitors after the hour still get the
+  // old cached copy instantly while Vercel refetches in the background,
+  // so ScraperAPI only gets hit roughly once per hour, not per-visitor.
+  res.setHeader(
+    'Cache-Control',
+    's-maxage=3600, stale-while-revalidate=86400'
+  );
+
   try {
-    const cached = await kv.get('nextendo-status');
-    const lastFetch = (await kv.get('nextendo-status-time')) || 0;
-    const isStale = Date.now() - lastFetch > CACHE_TTL_MS;
-
-    if (cached && !isStale) {
-      return res.status(200).json(cached);
-    }
-
-    // Cache missing or stale — fetch fresh
     // keep_headers=true tells ScraperAPI to actually forward our Cookie/Referer/UA
     // to the target site instead of using its own defaults.
     const proxyUrl =
@@ -45,21 +42,14 @@ export default async function handler(req, res) {
       throw new Error(`Non-JSON response from target: ${rawText.slice(0, 300)}`);
     }
 
-    await kv.set('nextendo-status', data);
-    await kv.set('nextendo-status-time', Date.now());
-
     return res.status(200).json(data);
 
   } catch (error) {
     console.error("Fetch Error:", error.message);
-
-    // fall back to stale cache if we have one, rather than erroring out
-    const cached = await kv.get('nextendo-status').catch(() => null);
-    if (cached) {
-      console.warn("Serving stale cache due to fetch error");
-      return res.status(200).json(cached);
-    }
-
+    // No KV fallback available here — if this fails, the client just gets
+    // a 500. Vercel's CDN cache (if a previous successful response is still
+    // within its cache window) may still serve older visitors the old data
+    // without this function even running.
     return res.status(500).json({ error: "Failed to fetch status", message: error.message });
   }
 }
