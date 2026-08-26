@@ -14,6 +14,7 @@
         }
         h1 { text-align: center; margin-bottom: 10px; }
         
+        /* New Game Alert Banner */
         #new-game-banner {
             display: none;
             background: linear-gradient(90deg, #2563eb, #7c3aed);
@@ -26,7 +27,7 @@
             font-weight: bold;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
-        #new-game-banner span.badge {
+        #new-game-banner span {
             background-color: #ef4444;
             font-size: 0.75rem;
             padding: 3px 8px;
@@ -45,8 +46,10 @@
         .game-card {
             background-color: #1e1e1e; border-radius: 12px; overflow: hidden;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3); text-align: center;
+            transition: transform 0.2s;
             display: flex; flex-direction: column; justify-content: space-between;
         }
+        .game-card:hover { transform: translateY(-5px); }
         .game-cover { width: 100%; height: 200px; object-fit: cover; background-color: #2a2a2a; }
         .game-info { padding: 15px; }
         .game-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 8px; color: #ffffff; }
@@ -58,66 +61,213 @@
 
     <h1>Nextendo Online Status</h1>
     
+    <!-- Header for newly added games -->
     <div id="new-game-banner">
-        <span class="badge">NEW</span> <span id="new-game-text"></span>
+        <span>NEW</span> <span id="new-game-text">New game added to the Nextendo Network!</span>
     </div>
 
     <div id="status-container">
-        <p id="loading">Fetching network status from Vercel edge cache...</p>
+        <p id="loading">Loading database & status...</p>
     </div>
 
     <script>
+        const API_URL = "/api/status";
+        const TITLE_DB_URL = "https://raw.githubusercontent.com/blawar/titledb/master/US.en.json";
+        const DEFAULT_FALLBACK_SVG = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256" background="%232a2a2a"%3E%3Ctext x="50%25" y="50%25" fill="%23fff" text-anchor="middle" alignment-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
+
+        let gameTitleDatabase = {};
+
+        // Fetch external Switch title database mapping Title IDs -> Names
+        async function loadTitleDatabase() {
+            try {
+                const res = await fetch(TITLE_DB_URL);
+                if (res.ok) {
+                    gameTitleDatabase = await res.json();
+                }
+            } catch (err) {
+                console.warn("Could not fetch remote title database, falling back to ID display.", err);
+            }
+        }
+
+        // Cache icon URLs from SwitchIconShowdown
+        function getCachedIcon(gameName) {
+            try {
+                const cache = JSON.parse(localStorage.getItem('switch_icon_cache') || '{}');
+                return cache[gameName] || null;
+            } catch (e) { return null; }
+        }
+
+        function setCachedIcon(gameName, url) {
+            try {
+                const cache = JSON.parse(localStorage.getItem('switch_icon_cache') || '{}');
+                cache[gameName] = url;
+                localStorage.setItem('switch_icon_cache', JSON.stringify(cache));
+            } catch (e) {}
+        }
+
+        async function fetchGameIconUrl(gameName) {
+            const cached = getCachedIcon(gameName);
+            if (cached) return cached;
+
+            try {
+                const searchTarget = `https://www.switchiconshowdown.com/search.php?query=${encodeURIComponent(gameName)}`;
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(searchTarget)}`;
+                
+                const response = await fetch(proxyUrl);
+                if (!response.ok) return null;
+                
+                const payload = await response.json();
+                if (!payload.contents) return null;
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(payload.contents, 'text/html');
+                const rows = doc.querySelectorAll('table tr');
+
+                for (const row of rows) {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 2) {
+                        const titleText = cells[1].textContent.trim().toLowerCase();
+                        const targetText = gameName.toLowerCase();
+
+                        if (titleText === targetText || titleText.includes(targetText) || targetText.includes(titleText)) {
+                            const img = cells[0].querySelector('img');
+                            if (img) {
+                                const src = img.getAttribute('src');
+                                const match = src.match(/(\d+)\.png/);
+                                if (match && match[1]) {
+                                    const fullResUrl = `https://switchiconshowdown.com/images/${match[1]}.png`;
+                                    setCachedIcon(gameName, fullResUrl);
+                                    return fullResUrl;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(`Error scraping icon for ${gameName}:`, err);
+            }
+            return null;
+        }
+
+        // Track when games are first seen to show the "New game added" banner
+        function handleNewGameTracking(titleId, name) {
+            let trackedGames = {};
+            try {
+                trackedGames = JSON.parse(localStorage.getItem('nextendo_tracked_games') || '{}');
+            } catch (e) {}
+
+            const cleanId = titleId.toUpperCase();
+            if (!trackedGames[cleanId]) {
+                trackedGames[cleanId] = {
+                    name: name,
+                    firstSeen: Date.now()
+                };
+                localStorage.setItem('nextendo_tracked_games', JSON.stringify(trackedGames));
+            }
+
+            return trackedGames;
+        }
+
+        function checkAndDisplayNewGameBanner(trackedGames) {
+            const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            let newestGame = null;
+
+            Object.values(trackedGames).forEach(game => {
+                if (now - game.firstSeen <= TWO_DAYS_MS) {
+                    if (!newestGame || game.firstSeen > newestGame.firstSeen) {
+                        newestGame = game;
+                    }
+                }
+            });
+
+            const banner = document.getElementById('new-game-banner');
+            const bannerText = document.getElementById('new-game-text');
+
+            if (newestGame) {
+                bannerText.textContent = `New game added to the Nextendo Network: ${newestGame.name}!`;
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+
         async function fetchStatus() {
             const container = document.getElementById('status-container');
             
             try {
-                const response = await fetch('/api/games-status');
-                if (!response.ok) throw new Error("Failed to communicate with Vercel function");
+                // Fetch the database and status concurrently
+                const [_, response] = await Promise.all([
+                    loadTitleDatabase(),
+                    fetch(API_URL)
+                ]);
+
+                if (!response.ok) throw new Error("Backend failed to load status data");
 
                 const data = await response.json();
-                if (!data.success) throw new Error("API returned an error state");
-
-                // Handle New Game Banner display
-                if (data.newestGame) {
-                    const banner = document.getElementById('new-game-banner');
-                    document.getElementById('new-game-text').textContent = `New game added to the Nextendo Network: ${data.newestGame}!`;
-                    banner.style.display = 'block';
-                }
-
+                
                 container.innerHTML = '<div class="grid" id="game-grid"></div>';
                 const grid = document.getElementById('game-grid');
 
-                data.games.forEach(game => {
-                    const card = document.createElement('div');
-                    card.className = 'game-card';
+                if (data.counts) {
+                    let trackedGames = {};
 
-                    const img = document.createElement('img');
-                    img.className = 'game-cover';
-                    img.src = game.icon;
-                    img.alt = game.name;
-                    img.onerror = () => { 
-                        img.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256" background="%232a2a2a"%3E%3Ctext x="50%25" y="50%25" fill="%23fff" text-anchor="middle" alignment-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E'; 
-                    };
+                    // Only process games returned by the API response
+                    Object.entries(data.counts).forEach(([titleIdRaw, count]) => {
+                        const cleanId = titleIdRaw.toUpperCase();
+                        
+                        // Fetch name from title database, or fallback to Title ID
+                        const dbEntry = gameTitleDatabase[cleanId] || gameTitleDatabase[titleIdRaw.toLowerCase()];
+                        const gameName = dbEntry ? dbEntry.name : `Game (${cleanId})`;
 
-                    const info = document.createElement('div');
-                    info.className = 'game-info';
-                    info.innerHTML = `
-                        <div class="game-title">${game.name}</div>
-                        <div style="font-size: 0.75rem; color: #888; margin-bottom: 10px;">ID: ${game.id}</div>
-                        <div class="online-count">🟢 ${game.players} Online</div>
-                    `;
+                        // Track newly detected games
+                        trackedGames = handleNewGameTracking(cleanId, gameName);
 
-                    card.appendChild(img);
-                    card.appendChild(info);
-                    grid.appendChild(card);
-                });
+                        const card = document.createElement('div');
+                        card.className = 'game-card';
+
+                        const img = document.createElement('img');
+                        img.className = 'game-cover';
+                        img.src = DEFAULT_FALLBACK_SVG;
+                        img.alt = gameName;
+
+                        // Fetch image dynamically
+                        fetchGameIconUrl(gameName).then(iconUrl => {
+                            if (iconUrl) {
+                                img.src = iconUrl;
+                            } else {
+                                img.src = `https://tinfoil.media/ti/${cleanId}/256/256/`;
+                            }
+                        });
+
+                        img.onerror = () => { img.src = DEFAULT_FALLBACK_SVG; };
+
+                        const info = document.createElement('div');
+                        info.className = 'game-info';
+                        info.innerHTML = `
+                            <div class="game-title">${gameName}</div>
+                            <div style="font-size: 0.75rem; color: #888; margin-bottom: 10px;">ID: ${cleanId}</div>
+                            <div class="online-count">🟢 ${Number(count) || 0} Online</div>
+                        `;
+
+                        card.appendChild(img);
+                        card.appendChild(info);
+                        grid.appendChild(card);
+                    });
+
+                    // Update banner if any game was added in the last 2 days
+                    checkAndDisplayNewGameBanner(trackedGames);
+
+                } else {
+                    throw new Error("Unexpected API response format");
+                }
 
             } catch (error) {
-                console.error("Error:", error);
+                console.error("Failed to fetch status:", error);
                 container.innerHTML = `
                     <div class="error-message">
                         <h2>Unable to load status</h2>
-                        <p>There was an error connecting to the backend service.</p>
+                        <p>There was an error connecting to the API.</p>
                     </div>
                 `;
             }
