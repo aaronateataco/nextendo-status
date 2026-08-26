@@ -40,13 +40,13 @@
     </div>
 
     <script>
-        // Because Vercel hosts both, we can just fetch our own clean API endpoint
         const API_URL = "/api/status";
         const IMAGE_BASE_URL = "https://tinfoil.media/ti";
         const IMAGE_SIZE = "256/256"; 
 
+        // Title ID converted to uppercase for cover images
         function getCoverUrl(titleId) {
-            return `${IMAGE_BASE_URL}/${titleId}/${IMAGE_SIZE}/`;
+            return `${IMAGE_BASE_URL}/${titleId.toUpperCase()}/${IMAGE_SIZE}/`;
         }
 
         async function fetchStatus() {
@@ -61,9 +61,10 @@
                 container.innerHTML = '<div class="grid" id="game-grid"></div>';
                 const grid = document.getElementById('game-grid');
 
-                // FIXED: Check for data.counts and use Object.entries instead of data.forEach
                 if (data.counts) {
-                    Object.entries(data.counts).forEach(([titleId, onlineCount]) => {
+                    Object.entries(data.counts).forEach(([titleIdRaw, onlineCount]) => {
+                        const titleId = titleIdRaw.toUpperCase();
+
                         const card = document.createElement('div');
                         card.className = 'game-card';
 
