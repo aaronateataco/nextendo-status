@@ -12,7 +12,30 @@
             margin: 0;
             padding: 20px;
         }
-        h1 { text-align: center; margin-bottom: 30px; }
+        h1 { text-align: center; margin-bottom: 10px; }
+        
+        /* New Game Alert Banner */
+        #new-game-banner {
+            display: none;
+            background: linear-gradient(90deg, #2563eb, #7c3aed);
+            color: #ffffff;
+            text-align: center;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin: 0 auto 25px auto;
+            max-width: 1200px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        #new-game-banner span {
+            background-color: #ef4444;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            margin-right: 8px;
+        }
+
         #status-container {
             display: flex; justify-content: center; align-items: center; min-height: 50vh;
         }
@@ -37,30 +60,36 @@
 <body>
 
     <h1>Nextendo Online Status</h1>
+    
+    <!-- Header for newly added games -->
+    <div id="new-game-banner">
+        <span>NEW</span> <span id="new-game-text">New game added to the Nextendo Network!</span>
+    </div>
+
     <div id="status-container">
-        <p id="loading">Fetching online counts...</p>
+        <p id="loading">Loading database & status...</p>
     </div>
 
     <script>
         const API_URL = "/api/status";
+        const TITLE_DB_URL = "https://raw.githubusercontent.com/blawar/titledb/master/US.en.json";
         const DEFAULT_FALLBACK_SVG = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256" background="%232a2a2a"%3E%3Ctext x="50%25" y="50%25" fill="%23fff" text-anchor="middle" alignment-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
 
-        const GAMES = [
-            { name: "Mario Kart 8 Deluxe", ids: ["0100152000022000"] },
-            { name: "Splatoon 2", ids: ["0100f8f0000a2000", "01003bc0000a0000", "01003c700009c800"] },
-            { name: "Splatoon 3", ids: ["0100c2500fc20000"] },
-            { name: "Super Smash Bros. Ultimate", ids: ["01006a800016e000"] },
-            { name: "Animal Crossing: New Horizons", ids: ["01006f8002326000"] },
-            { name: "Luigi's Mansion 3", ids: ["0100dca0064a6000"] },
-            { name: "Minecraft: Nintendo Switch Edition", ids: ["01006bd001e06000"] },
-            { name: "ARMS", ids: ["01009b500007c000"] },
-            { name: "Mario Tennis Aces", ids: ["0100bde00862a000"] },
-            { name: "Super Mario Maker 2", ids: ["01009b90006dc000"] },
-            { name: "PAC-MAN 99", ids: ["0100ad9012510000"] },
-            { name: "SUPER MARIO BROS. 35", ids: ["0100277011f1a000"] }
-        ];
+        let gameTitleDatabase = {};
 
-        // Cache icon URLs locally so we don't spam search requests
+        // Fetch external Switch title database mapping Title IDs -> Names
+        async function loadTitleDatabase() {
+            try {
+                const res = await fetch(TITLE_DB_URL);
+                if (res.ok) {
+                    gameTitleDatabase = await res.json();
+                }
+            } catch (err) {
+                console.warn("Could not fetch remote title database, falling back to ID display.", err);
+            }
+        }
+
+        // Cache icon URLs from SwitchIconShowdown
         function getCachedIcon(gameName) {
             try {
                 const cache = JSON.parse(localStorage.getItem('switch_icon_cache') || '{}');
@@ -76,7 +105,6 @@
             } catch (e) {}
         }
 
-        // Scrape search results from SwitchIconShowdown for the game icon
         async function fetchGameIconUrl(gameName) {
             const cached = getCachedIcon(gameName);
             if (cached) return cached;
@@ -101,11 +129,10 @@
                         const titleText = cells[1].textContent.trim().toLowerCase();
                         const targetText = gameName.toLowerCase();
 
-                        // Match exact title or close containment match
                         if (titleText === targetText || titleText.includes(targetText) || targetText.includes(titleText)) {
                             const img = cells[0].querySelector('img');
                             if (img) {
-                                const src = img.getAttribute('src'); // e.g. "./images/100/4582.png"
+                                const src = img.getAttribute('src');
                                 const match = src.match(/(\d+)\.png/);
                                 if (match && match[1]) {
                                     const fullResUrl = `https://switchiconshowdown.com/images/${match[1]}.png`;
@@ -122,22 +149,60 @@
             return null;
         }
 
-        function lookupGame(titleId) {
-            const cleanId = titleId.toLowerCase();
-            for (const game of GAMES) {
-                if (game.ids.some(id => id.toLowerCase() === cleanId)) {
-                    return { name: game.name, id: game.ids[0].toUpperCase() };
-                }
+        // Track when games are first seen to show the "New game added" banner
+        function handleNewGameTracking(titleId, name) {
+            let trackedGames = {};
+            try {
+                trackedGames = JSON.parse(localStorage.getItem('nextendo_tracked_games') || '{}');
+            } catch (e) {}
+
+            const cleanId = titleId.toUpperCase();
+            if (!trackedGames[cleanId]) {
+                trackedGames[cleanId] = {
+                    name: name,
+                    firstSeen: Date.now()
+                };
+                localStorage.setItem('nextendo_tracked_games', JSON.stringify(trackedGames));
             }
-            return { name: `Unknown Game (${titleId.toUpperCase()})`, id: titleId.toUpperCase() };
+
+            return trackedGames;
+        }
+
+        function checkAndDisplayNewGameBanner(trackedGames) {
+            const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            let newestGame = null;
+
+            Object.values(trackedGames).forEach(game => {
+                if (now - game.firstSeen <= TWO_DAYS_MS) {
+                    if (!newestGame || game.firstSeen > newestGame.firstSeen) {
+                        newestGame = game;
+                    }
+                }
+            });
+
+            const banner = document.getElementById('new-game-banner');
+            const bannerText = document.getElementById('new-game-text');
+
+            if (newestGame) {
+                bannerText.textContent = `New game added to the Nextendo Network: ${newestGame.name}!`;
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
         }
 
         async function fetchStatus() {
             const container = document.getElementById('status-container');
             
             try {
-                const response = await fetch(API_URL);
-                if (!response.ok) throw new Error("Backend failed to load data");
+                // Fetch the database and status concurrently
+                const [_, response] = await Promise.all([
+                    loadTitleDatabase(),
+                    fetch(API_URL)
+                ]);
+
+                if (!response.ok) throw new Error("Backend failed to load status data");
 
                 const data = await response.json();
                 
@@ -145,32 +210,33 @@
                 const grid = document.getElementById('game-grid');
 
                 if (data.counts) {
-                    const gameDataMap = new Map();
+                    let trackedGames = {};
 
+                    // Only process games returned by the API response
                     Object.entries(data.counts).forEach(([titleIdRaw, count]) => {
-                        const { name, id } = lookupGame(titleIdRaw);
-                        if (!gameDataMap.has(name)) {
-                            gameDataMap.set(name, { name, mainId: id, totalCount: 0 });
-                        }
-                        gameDataMap.get(name).totalCount += Number(count) || 0;
-                    });
+                        const cleanId = titleIdRaw.toUpperCase();
+                        
+                        // Fetch name from title database, or fallback to Title ID
+                        const dbEntry = gameTitleDatabase[cleanId] || gameTitleDatabase[titleIdRaw.toLowerCase()];
+                        const gameName = dbEntry ? dbEntry.name : `Game (${cleanId})`;
 
-                    gameDataMap.forEach(game => {
+                        // Track newly detected games
+                        trackedGames = handleNewGameTracking(cleanId, gameName);
+
                         const card = document.createElement('div');
                         card.className = 'game-card';
 
                         const img = document.createElement('img');
                         img.className = 'game-cover';
-                        img.src = DEFAULT_FALLBACK_SVG; // Placeholder while scraping
-                        img.alt = game.name;
+                        img.src = DEFAULT_FALLBACK_SVG;
+                        img.alt = gameName;
 
-                        // Async fetch icon from SwitchIconShowdown
-                        fetchGameIconUrl(game.name).then(iconUrl => {
+                        // Fetch image dynamically
+                        fetchGameIconUrl(gameName).then(iconUrl => {
                             if (iconUrl) {
                                 img.src = iconUrl;
                             } else {
-                                // Fallback to tinfoil.media if not found on SwitchIconShowdown
-                                img.src = `https://tinfoil.media/ti/${game.mainId}/256/256/`;
+                                img.src = `https://tinfoil.media/ti/${cleanId}/256/256/`;
                             }
                         });
 
@@ -179,15 +245,18 @@
                         const info = document.createElement('div');
                         info.className = 'game-info';
                         info.innerHTML = `
-                            <div class="game-title">${game.name}</div>
-                            <div style="font-size: 0.75rem; color: #888; margin-bottom: 10px;">ID: ${game.mainId}</div>
-                            <div class="online-count">🟢 ${game.totalCount} Online</div>
+                            <div class="game-title">${gameName}</div>
+                            <div style="font-size: 0.75rem; color: #888; margin-bottom: 10px;">ID: ${cleanId}</div>
+                            <div class="online-count">🟢 ${Number(count) || 0} Online</div>
                         `;
 
                         card.appendChild(img);
                         card.appendChild(info);
                         grid.appendChild(card);
                     });
+
+                    // Update banner if any game was added in the last 2 days
+                    checkAndDisplayNewGameBanner(trackedGames);
 
                 } else {
                     throw new Error("Unexpected API response format");
