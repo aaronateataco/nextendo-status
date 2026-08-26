@@ -4,76 +4,218 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nextendo Network Status</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background-color: #121212;
-            color: #ffffff;
-            margin: 0;
-            padding: 20px;
+        :root {
+            --bg: #12141a;
+            --panel: #1a1d26;
+            --panel-hover: #20232e;
+            --border: #2a2e3a;
+            --text: #edeff5;
+            --text-muted: #868c9c;
+            --accent: #ff8a4c;
+            --live: #34d399;
+            --live-dim: rgba(52, 211, 153, 0.15);
         }
-        h1 { text-align: center; margin-bottom: 10px; }
-        
-        /* New Game Alert Banner */
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(circle at 15% 0%, rgba(255, 138, 76, 0.07), transparent 40%),
+                radial-gradient(circle at 85% 15%, rgba(52, 211, 153, 0.06), transparent 40%);
+            background-attachment: fixed;
+            color: var(--text);
+            margin: 0;
+            padding: 48px 20px 64px;
+            min-height: 100vh;
+        }
+
+        header {
+            max-width: 1100px;
+            margin: 0 auto 8px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.85rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+
+        #live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.78rem;
+            color: var(--live);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--live);
+            box-shadow: 0 0 0 0 var(--live-dim);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%   { box-shadow: 0 0 0 0 var(--live-dim); }
+            70%  { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+        }
+
+        .subtitle {
+            max-width: 1100px;
+            margin: 0 auto 32px;
+            color: var(--text-muted);
+            font-size: 0.92rem;
+        }
+
         #new-game-banner {
             display: none;
-            background: linear-gradient(90deg, #2563eb, #7c3aed);
-            color: #ffffff;
-            text-align: center;
-            padding: 12px 20px;
-            border-radius: 8px;
-            margin: 0 auto 25px auto;
-            max-width: 1200px;
-            font-weight: bold;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            color: var(--text);
+            padding: 14px 18px;
+            border-radius: 10px;
+            margin: 0 auto 28px auto;
+            max-width: 1100px;
+            font-size: 0.9rem;
+            align-items: center;
+            gap: 10px;
         }
-        #new-game-banner span {
-            background-color: #ef4444;
-            font-size: 0.75rem;
+        #new-game-banner .eyebrow {
+            background: var(--accent);
+            color: #1a1206;
+            font-size: 0.65rem;
+            font-weight: 700;
             padding: 3px 8px;
-            border-radius: 12px;
-            text-transform: uppercase;
-            margin-right: 8px;
+            border-radius: 5px;
+            letter-spacing: 0.06em;
+            flex-shrink: 0;
         }
 
         #status-container {
-            display: flex; justify-content: center; align-items: center; min-height: 50vh;
+            max-width: 1100px;
+            margin: 0 auto;
         }
+
+        #loading, .error-message {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 80px 20px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9rem;
+        }
+        .error-message h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
         .grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 20px; width: 100%; max-width: 1200px; margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 18px;
         }
+
         .game-card {
-            background-color: #1e1e1e; border-radius: 12px; overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3); text-align: center;
-            transition: transform 0.2s;
-            display: flex; flex-direction: column; justify-content: space-between;
+            background-color: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            text-align: left;
+            transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
         }
-        .game-card:hover { transform: translateY(-5px); }
-        .game-cover { width: 100%; height: 200px; object-fit: cover; background-color: #2a2a2a; }
-        .game-info { padding: 15px; }
-        .game-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 8px; color: #ffffff; }
-        .online-count { font-size: 1.3rem; font-weight: bold; color: #4ade80; }
-        .error-message { color: #ef4444; text-align: center; }
+        .game-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(255, 138, 76, 0.35);
+            background-color: var(--panel-hover);
+        }
+
+        .game-cover-wrap {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-color: #23262f;
+            overflow: hidden;
+        }
+        .game-cover {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .game-info { padding: 14px 16px 16px; }
+        .game-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 1rem;
+            line-height: 1.25;
+            margin-bottom: 3px;
+            color: var(--text);
+        }
+        .game-id {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .online-count {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--live);
+        }
+        .online-count .label {
+            font-size: 0.68rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
     </style>
 </head>
 <body>
 
-    <h1>Nextendo Online Status</h1>
-    
-    <!-- Header for newly added games -->
+    <header>
+        <h1>Nextendo Network Status</h1>
+        <span id="live-indicator"><span class="dot"></span>Live</span>
+    </header>
+    <p class="subtitle">Real-time player counts across the Nextendo Network, refreshed hourly.</p>
+
     <div id="new-game-banner">
-        <span>NEW</span> <span id="new-game-text">New game added to the Nextendo Network!</span>
+        <span class="eyebrow">New</span> <span id="new-game-text">New game added to the Nextendo Network!</span>
     </div>
 
     <div id="status-container">
-        <p id="loading">Loading database & status...</p>
+        <p id="loading">Fetching database &amp; status&hellip;</p>
     </div>
 
     <script>
         const API_URL = "/api/status";
         const TITLE_DB_URL = "https://raw.githubusercontent.com/blawar/titledb/master/US.en.json";
-        const DEFAULT_FALLBACK_SVG = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256" background="%232a2a2a"%3E%3Ctext x="50%25" y="50%25" fill="%23fff" text-anchor="middle" alignment-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
+        const DEFAULT_FALLBACK_SVG = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256"%3E%3Crect width="256" height="256" fill="%2323262f"/%3E%3Ctext x="50%25" y="50%25" fill="%23868c9c" font-family="sans-serif" font-size="16" text-anchor="middle" alignment-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
 
         let gameTitleDatabase = {};
 
@@ -112,10 +254,10 @@
             try {
                 const searchTarget = `https://www.switchiconshowdown.com/search.php?query=${encodeURIComponent(gameName)}`;
                 const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(searchTarget)}`;
-                
+
                 const response = await fetch(proxyUrl);
                 if (!response.ok) return null;
-                
+
                 const payload = await response.json();
                 if (!payload.contents) return null;
 
@@ -149,16 +291,17 @@
             return null;
         }
 
-        // Track when games are first seen to show the "New game added" banner
-        function handleNewGameTracking(titleId, name) {
+        // Track when games are first seen to show the "New game added" banner.
+        // Keyed by the *merged* game name (normalized), so multiple title IDs
+        // for the same game don't each re-trigger "new" separately.
+        function handleNewGameTracking(groupKey, name) {
             let trackedGames = {};
             try {
                 trackedGames = JSON.parse(localStorage.getItem('nextendo_tracked_games') || '{}');
             } catch (e) {}
 
-            const cleanId = titleId.toUpperCase();
-            if (!trackedGames[cleanId]) {
-                trackedGames[cleanId] = {
+            if (!trackedGames[groupKey]) {
+                trackedGames[groupKey] = {
                     name: name,
                     firstSeen: Date.now()
                 };
@@ -186,17 +329,42 @@
 
             if (newestGame) {
                 bannerText.textContent = `New game added to the Nextendo Network: ${newestGame.name}!`;
-                banner.style.display = 'block';
+                banner.style.display = 'flex';
             } else {
                 banner.style.display = 'none';
             }
         }
 
+        // Normalize a display name so title ID variants that resolve to the
+        // exact same game name get merged into one card.
+        function normalizeKey(name) {
+            return name.trim().toLowerCase();
+        }
+
+        function buildGameGroups(counts) {
+            const groups = new Map(); // key -> { name, ids: [], count }
+
+            Object.entries(counts).forEach(([titleIdRaw, count]) => {
+                const cleanId = titleIdRaw.toUpperCase();
+                const dbEntry = gameTitleDatabase[cleanId] || gameTitleDatabase[titleIdRaw.toLowerCase()];
+                const gameName = dbEntry ? dbEntry.name : `Game (${cleanId})`;
+                const key = normalizeKey(gameName);
+
+                if (!groups.has(key)) {
+                    groups.set(key, { name: gameName, ids: [], count: 0 });
+                }
+                const group = groups.get(key);
+                group.ids.push(cleanId);
+                group.count += Number(count) || 0;
+            });
+
+            return Array.from(groups.entries()).map(([key, g]) => ({ key, ...g }));
+        }
+
         async function fetchStatus() {
             const container = document.getElementById('status-container');
-            
+
             try {
-                // Fetch the database and status concurrently
                 const [_, response] = await Promise.all([
                     loadTitleDatabase(),
                     fetch(API_URL)
@@ -205,57 +373,68 @@
                 if (!response.ok) throw new Error("Backend failed to load status data");
 
                 const data = await response.json();
-                
+
                 container.innerHTML = '<div class="grid" id="game-grid"></div>';
                 const grid = document.getElementById('game-grid');
 
                 if (data.counts) {
+                    // Merge title IDs that resolve to the same game name so a
+                    // title with multiple regional/update IDs shows one card
+                    // with a combined online count instead of duplicates.
+                    const groups = buildGameGroups(data.counts)
+                        .sort((a, b) => b.count - a.count);
+
                     let trackedGames = {};
 
-                    // Only process games returned by the API response
-                    Object.entries(data.counts).forEach(([titleIdRaw, count]) => {
-                        const cleanId = titleIdRaw.toUpperCase();
-                        
-                        // Fetch name from title database, or fallback to Title ID
-                        const dbEntry = gameTitleDatabase[cleanId] || gameTitleDatabase[titleIdRaw.toLowerCase()];
-                        const gameName = dbEntry ? dbEntry.name : `Game (${cleanId})`;
-
-                        // Track newly detected games
-                        trackedGames = handleNewGameTracking(cleanId, gameName);
+                    groups.forEach(group => {
+                        trackedGames = handleNewGameTracking(group.key, group.name);
 
                         const card = document.createElement('div');
                         card.className = 'game-card';
 
+                        const coverWrap = document.createElement('div');
+                        coverWrap.className = 'game-cover-wrap';
+
                         const img = document.createElement('img');
                         img.className = 'game-cover';
                         img.src = DEFAULT_FALLBACK_SVG;
-                        img.alt = gameName;
+                        img.alt = group.name;
+                        img.loading = 'lazy';
 
-                        // Fetch image dynamically
-                        fetchGameIconUrl(gameName).then(iconUrl => {
+                        // Use the first title ID in the group for the fallback
+                        // cover art lookup.
+                        const primaryId = group.ids[0];
+
+                        fetchGameIconUrl(group.name).then(iconUrl => {
                             if (iconUrl) {
                                 img.src = iconUrl;
                             } else {
-                                img.src = `https://tinfoil.media/ti/${cleanId}/256/256/`;
+                                img.src = `https://tinfoil.media/ti/${primaryId}/256/256/`;
                             }
                         });
 
                         img.onerror = () => { img.src = DEFAULT_FALLBACK_SVG; };
 
+                        coverWrap.appendChild(img);
+
                         const info = document.createElement('div');
                         info.className = 'game-info';
+
+                        const idLabel = group.ids.length > 1
+                            ? `${group.ids.length} regions/editions`
+                            : group.ids[0];
+
                         info.innerHTML = `
-                            <div class="game-title">${gameName}</div>
-                            <div style="font-size: 0.75rem; color: #888; margin-bottom: 10px;">ID: ${cleanId}</div>
-                            <div class="online-count">🟢 ${Number(count) || 0} Online</div>
+                            <div class="game-title">${group.name}</div>
+                            <div class="game-id">${idLabel}</div>
+                            <div class="online-count">${group.count} <span class="label">online</span></div>
                         `;
 
-                        card.appendChild(img);
+                        card.appendChild(coverWrap);
                         card.appendChild(info);
                         grid.appendChild(card);
                     });
 
-                    // Update banner if any game was added in the last 2 days
                     checkAndDisplayNewGameBanner(trackedGames);
 
                 } else {
@@ -267,7 +446,7 @@
                 container.innerHTML = `
                     <div class="error-message">
                         <h2>Unable to load status</h2>
-                        <p>There was an error connecting to the API.</p>
+                        <p>There was an error connecting to the API. Try refreshing in a moment.</p>
                     </div>
                 `;
             }
