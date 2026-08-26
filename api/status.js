@@ -4,20 +4,24 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Methods', 'GET');
 
     try {
-        // We use AllOrigins IN the backend to bypass Nextendo's Cloudflare bot protection
         const TARGET_URL = encodeURIComponent("https://nextendo.network/api/online-counts");
-        const PROXY_URL = `https://api.allorigins.win/raw?url=${TARGET_URL}`;
+        
+        // Switching to CorsProxy.io which has a better success rate against Cloudflare
+        const PROXY_URL = `https://corsproxy.io/?url=${TARGET_URL}`;
 
-        const response = await fetch(PROXY_URL);
+        const response = await fetch(PROXY_URL, {
+            // Adding basic headers to look slightly more like a real browser
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "application/json"
+            }
+        });
 
         if (!response.ok) {
-            throw new Error(`Proxy responded with status: ${response.status}`);
+            throw new Error(`CorsProxy responded with status: ${response.status}`);
         }
 
-        // Parse the data from the proxy
         const data = await response.json();
-        
-        // Send it cleanly to your frontend
         return res.status(200).json(data);
 
     } catch (error) {
