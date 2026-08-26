@@ -61,30 +61,32 @@
                 container.innerHTML = '<div class="grid" id="game-grid"></div>';
                 const grid = document.getElementById('game-grid');
 
-                data.forEach(game => {
-                    const titleId = game.title_id; 
-                    const onlineCount = game.count; 
+                // FIXED: Check for data.counts and use Object.entries instead of data.forEach
+                if (data.counts) {
+                    Object.entries(data.counts).forEach(([titleId, onlineCount]) => {
+                        const card = document.createElement('div');
+                        card.className = 'game-card';
 
-                    const card = document.createElement('div');
-                    card.className = 'game-card';
+                        const img = document.createElement('img');
+                        img.className = 'game-cover';
+                        img.src = getCoverUrl(titleId);
+                        img.alt = `Game ${titleId}`;
+                        img.onerror = () => { img.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256" background="%232a2a2a"%3E%3Ctext x="50%25" y="50%25" fill="%23fff" text-anchor="middle" alignment-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E'; };
 
-                    const img = document.createElement('img');
-                    img.className = 'game-cover';
-                    img.src = getCoverUrl(titleId);
-                    img.alt = `Game ${titleId}`;
-                    img.onerror = () => { img.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256" background="%232a2a2a"%3E%3Ctext x="50%25" y="50%25" fill="%23fff" text-anchor="middle" alignment-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E'; };
+                        const info = document.createElement('div');
+                        info.className = 'game-info';
+                        info.innerHTML = `
+                            <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 5px;">ID: ${titleId}</div>
+                            <div class="online-count">🟢 ${onlineCount} Online</div>
+                        `;
 
-                    const info = document.createElement('div');
-                    info.className = 'game-info';
-                    info.innerHTML = `
-                        <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 5px;">ID: ${titleId}</div>
-                        <div class="online-count">🟢 ${onlineCount} Online</div>
-                    `;
-
-                    card.appendChild(img);
-                    card.appendChild(info);
-                    grid.appendChild(card);
-                });
+                        card.appendChild(img);
+                        card.appendChild(info);
+                        grid.appendChild(card);
+                    });
+                } else {
+                    throw new Error("Unexpected API response format");
+                }
 
             } catch (error) {
                 console.error("Failed to fetch status:", error);
